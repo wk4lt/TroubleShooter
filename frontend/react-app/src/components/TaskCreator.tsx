@@ -13,6 +13,7 @@ export function TaskCreator({ onSubmit, disabled, skill, onClearSkill }: Props) 
   const handleSubmit = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
+    setValue("");
     onSubmit(trimmed);
   };
 
@@ -34,7 +35,10 @@ export function TaskCreator({ onSubmit, disabled, skill, onClearSkill }: Props) 
         disabled={disabled}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter") handleSubmit();
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleSubmit();
+          }
         }}
       />
       <button className="button" onClick={handleSubmit} disabled={disabled || !value.trim()}>

@@ -19,6 +19,9 @@ function fmt(v: unknown): string {
 
 export function TaskRunCard({ run }: { run: TaskRun }) {
   const toolCalls = run.events.filter((e) => e.type === "tool_call");
+  const progressEvents = run.events.filter((e) =>
+    e.type === "thinking" || e.type === "tool_call" || e.type === "tool_result"
+  );
   const messages = run.events
     .filter((e) => e.type === "message")
     .map((e) => e.content)
@@ -41,8 +44,38 @@ export function TaskRunCard({ run }: { run: TaskRun }) {
           </span>
         </div>
         <div className="msg-body">
-          {running && !hasFinal && (
-            <span className="msg-thinking">正在处理…</span>
+          {progressEvents.length > 0 && (
+            <div className="msg-progress">
+              {progressEvents.map((event, index) => (
+                <div key={`${event.type}-${index}`} className={`progress-${event.type}`}>
+                  {event.type === "thinking" && <>💭 {event.content}</>}
+                  {event.type === "tool_call" && (
+                    <>
+                      🔧 调用工具 <span className="mono">{event.tool}</span>
+                      {event.skill && <> · Skill: <span className="mono">{event.skill}</span></>}
+                      {event.arguments && (
+                        <details className="progress-arguments">
+                          <summary>查看参数</summary>
+                          <pre>{fmt(event.arguments)}</pre>
+                        </details>
+                      )}
+                    </>
+                  )}
+                  {event.type === "tool_result" && (
+                    <details className="progress-result">
+                      <summary>
+                        📦 工具 <span className="mono">{event.tool}</span> 已返回结果
+                      </summary>
+                      <pre>{fmt(event.result)}</pre>
+                    </details>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {running && !hasFinal && progressEvents.length === 0 && (
+            <span className="msg-thinking">已发送，等待 Agent 响应…</span>
           )}
 
           {messages ? (

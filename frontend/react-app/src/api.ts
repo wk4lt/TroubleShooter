@@ -1,4 +1,4 @@
-import { FileMeta, SkillMeta } from "./types";
+import { FileDirectory, FileMeta, SkillMeta } from "./types";
 
 let sessionId = "";
 
@@ -53,6 +53,15 @@ export async function listFiles(): Promise<FileMeta[]> {
   }
   const data = await resp.json();
   return data.files;
+}
+
+export async function listDirectory(path = ""): Promise<FileDirectory> {
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
+  const resp = await fetch(`/api/files${query}`, { headers: headers() });
+  if (!resp.ok) {
+    throw new Error(`获取目录失败: ${resp.status}`);
+  }
+  return resp.json();
 }
 
 export async function deleteFile(fileId: string): Promise<void> {

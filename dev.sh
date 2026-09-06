@@ -50,6 +50,21 @@ is_running() {
   [ -f "$1" ] && kill -0 "$(cat "$1")" 2>/dev/null
 }
 
+wait_for_url() {
+  local url="$1"
+  local label="$2"
+  local attempts=0
+  while [ "$attempts" -lt 30 ]; do
+    if curl --noproxy '*' -fsS -o /dev/null "$url" 2>/dev/null; then
+      return 0
+    fi
+    attempts=$((attempts + 1))
+    sleep 0.5
+  done
+  echo "$label 启动失败，请查看对应日志"
+  return 1
+}
+
 start_backend() {
   if is_running "$BACKEND_PID"; then
     echo "backend 已在运行 (pid $(cat "$BACKEND_PID"))"
@@ -63,7 +78,12 @@ start_backend() {
       >> "$BACKEND_LOG" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID"
   )
-  sleep 1
+  if ! is_running "$BACKEND_PID"; then
+    echo "backend 进程未能启动，请查看 $BACKEND_LOG"
+    rm -f "$BACKEND_PID"
+    return 1
+  fi
+  wait_for_url "http://$BACKEND_HOST:$BACKEND_PORT/health" "backend"
   echo "backend 已启动 (pid $(cat "$BACKEND_PID"))"
 }
 
@@ -75,11 +95,16 @@ start_frontend() {
   echo "启动 frontend -> http://$UI_HOST:$UI_PORT"
   (
     cd "$ROOT/frontend/react-app"
-    setsid npm run dev -- --host "$UI_HOST" --port "$UI_PORT" \
+    VITE_BACKEND_PORT="$BACKEND_PORT" setsid npm run dev -- --host "$UI_HOST" --port "$UI_PORT" \
       >> "$FRONTEND_LOG" 2>&1 < /dev/null &
     echo $! > "$FRONTEND_PID"
   )
-  sleep 1
+  if ! is_running "$FRONTEND_PID"; then
+    echo "frontend 进程未能启动，请查看 $FRONTEND_LOG"
+    rm -f "$FRONTEND_PID"
+    return 1
+  fi
+  wait_for_url "http://$UI_HOST:$UI_PORT/" "frontend"
   echo "frontend 已启动 (pid $(cat "$FRONTEND_PID"))"
 }
 
@@ -163,7 +188,7 @@ build_ui() {
 health() {
   local ok=1
   for url in "http://$BACKEND_HOST:$BACKEND_PORT/health" "http://$UI_HOST:$UI_PORT/"; do
-    code="$(curl -s -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+    code="$(curl --noproxy '*' -s -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
     if [ "$code" = "200" ]; then
       echo "OK    $url"
     else

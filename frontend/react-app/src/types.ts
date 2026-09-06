@@ -7,8 +7,11 @@ export type EventType =
 
 export interface AgentEvent {
   type: EventType;
+  status?: string | null;
   content?: string | null;
   tool?: string | null;
+  skill?: string | null;
+  arguments?: Record<string, unknown> | null;
   result?: unknown;
   timestamp?: number;
 }
@@ -35,6 +38,17 @@ export interface FileMeta {
   filename: string;
   relpath?: string;
   size: number;
+}
+
+export interface DirectoryMeta {
+  name: string;
+  path: string;
+}
+
+export interface FileDirectory {
+  path: string;
+  directories: DirectoryMeta[];
+  files: FileMeta[];
 }
 
 export interface SkillMeta {

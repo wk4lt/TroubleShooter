@@ -3,7 +3,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
 
 
 class Settings:
@@ -15,7 +16,7 @@ class Settings:
         self.session_ttl_seconds = int(os.getenv("SESSION_TTL_SECONDS", "1800"))
         self.skills_dir = os.getenv(
             "SKILLS_DIR",
-            str(Path(__file__).resolve().parent.parent / "skills"),
+            str(BASE_DIR / "skills"),
         )
 
 

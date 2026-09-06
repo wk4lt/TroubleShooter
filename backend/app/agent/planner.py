@@ -11,12 +11,17 @@ SYSTEM_PROMPT = (
 )
 
 
-def build_system_prompt(skill: Optional[str] = None) -> str:
+def build_system_prompt(skill: Optional[str] = None, workspace_dir: Optional[str] = None) -> str:
+    workspace_note = (
+        f"当前任务工作目录是：{workspace_dir or '/backend/data/<session_id>'}。"
+        "用户上传或生成的文件都位于该目录及其子目录中。"
+        "执行 Skill 脚本时必须使用 WORKSPACE_DIR 访问这些文件，使用 SKILLS_ROOT 访问 Skill 脚本。"
+    )
     if skill:
         body = read_skill(skill)
         if body:
             return (
-                SYSTEM_PROMPT
+                SYSTEM_PROMPT + "\n" + workspace_note
                 + "\n\n"
                 + f"用户指定使用技能「{skill}」,必须严格遵循以下说明执行:\n\n"
                 + body
@@ -26,7 +31,7 @@ def build_system_prompt(skill: Optional[str] = None) -> str:
     if not summaries:
         return SYSTEM_PROMPT
 
-    lines = [SYSTEM_PROMPT, "", "可用技能(Skill):"]
+    lines = [SYSTEM_PROMPT, workspace_note, "", "可用技能(Skill):"]
     for s in summaries:
         desc = s["description"] or "(无描述)"
         lines.append(f"- {s['name']}: {desc}")
@@ -34,5 +39,17 @@ def build_system_prompt(skill: Optional[str] = None) -> str:
     return "\n".join(lines)
 
 
-def get_tool_specs() -> List[Dict[str, Any]]:
-    return registry.all_specs()
+def get_tool_specs(skill: Optional[str] = None) -> List[Dict[str, Any]]:
+    from app.tools.mcp_gateway import mcp_manager
+
+    mcp_manager.initialize()
+    allowed = mcp_manager.allowed_tool_names(skill)
+    specs = registry.all_specs(allowed)
+    # A selected Skill is already embedded in the system prompt, so asking
+    # the model to read it again only creates redundant tool rounds.
+    if skill:
+        specs = [
+            spec for spec in specs
+            if spec.get("function", {}).get("name") != "read_skill"
+        ]
+    return specs

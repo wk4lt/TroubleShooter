@@ -42,9 +42,15 @@ async def upload_file(
 
 
 @router.get("")
-async def list_files(x_session_id: str = Header(default="")):
+async def list_files(
+    path: str = Query(default=""),
+    x_session_id: str = Header(default=""),
+):
     session = _resolve_session(x_session_id, "")
-    return {"files": session.files.list()}
+    try:
+        return session.files.list_directory(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @router.get("/{file_id}")

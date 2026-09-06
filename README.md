@@ -17,7 +17,7 @@ LLM (OpenAI 兼容接口) + Tools + Session Memory
 
 ## 技术栈
 
-- 后端:Python 3.9+ / FastAPI / OpenAI SDK(兼容接口,默认 DeepSeek)
+- 后端:Python 3.9+ / FastAPI / LangGraph / OpenAI SDK(兼容接口,默认 DeepSeek)
 - 前端:React + TypeScript + Vite(原生,无 UI 框架)
 - 通信:SSE(`/api/task/{id}/stream`)
 
@@ -29,18 +29,18 @@ backend/
 │   ├── main.py          # FastAPI 入口、CORS、session 自动清理后台任务
 │   ├── config.py        # 环境变量配置
 │   ├── logger.py        # 结构化日志(文件 + 控制台)
-│   ├── agent/           # Agent 循环核心
-│   │   ├── loop.py      # 推理 → 工具 → 结果 → 继续 → final
+│   ├── agent/           # Agent Runtime(LangGraph 状态图)
+│   │   ├── loop.py      # 模型节点 → 工具节点 → 条件路由 → final
 │   │   ├── state.py     # AgentState
 │   │   ├── event.py     # AgentEvent 事件类型
 │   │   ├── planner.py   # 消息组装 + system prompt + 工具规格
 │   │   └── executor.py  # 工具调用执行
 │   ├── api/             # task / stream / files / logs 路由
 │   ├── llm/             # OpenAI 兼容 LLM 客户端
-│   ├── tools/           # 工具注册表 + 内置工具(builtin/examples/files/generate/skills)
+│   ├── tools/           # 工具注册表 + 内置工具 + Skill 脚本执行器
 │   ├── skills/          # Skill 加载器(扫描、解析、按需读取)
 │   └── storage/         # sessions / files / logs / contextvars
-├── skills/              # 预置 Skill(SKILL.md),如 log-troubleshooting
+├── skills/              # 预置 Skill(SKILL.md),当前为股票相关 skill
 ├── requirements.txt
 └── .env                 # 实际密钥(已 gitignore,需自行创建)
 frontend/
@@ -86,6 +86,8 @@ npm install
 npm run dev
 ```
 
+首次启动前端必须先执行一次 `npm install`;根目录 `./dev.sh start` 不会自动安装依赖。
+
 - 后端监听 `http://127.0.0.1:8000`
 - 前端监听 `http://127.0.0.1:5173`,已配置 `/api` 代理到后端
 
@@ -126,7 +128,7 @@ npm run dev
 ## Session 隔离与文件释放
 
 - 每个 `X-Session-Id` 对应一个独立工作区:上传/生成的文件、对话上下文、任务事件互相隔离。
-- 文件落盘在 `backend/data/files/{session_id}/`。
+- 文件落盘在 `backend/data/{session_id}/`，并保留前端上传时的相对目录结构；Skill 脚本通过 `WORKSPACE_DIR` 访问当前工作区。
 - 空闲超过 `SESSION_TTL_SECONDS` 且无运行中任务的 session 会被后台任务自动清理(连同磁盘文件一并释放)。
 
 ## Skill 机制
@@ -144,7 +146,25 @@ description: 日志故障定位:根据服务日志与错误堆栈系统化定位
 
 - 启动时自动扫描 `SKILLS_DIR`(默认 `backend/skills`),将每个 skill 的 `name + description` 注入 system prompt,让 Agent 知道有哪些能力。
 - Agent 需要详细说明时调用 `read_skill` 工具按需读取正文,避免大段说明常驻上下文。
+- Skill 需要执行外部脚本时调用 `run_skill_script`;运行路径限制在所选 Skill 目录内,且不经过 shell。
+- 股票 skill 的运行依赖已列入 `backend/requirements.txt`;首次安装后才可执行行情和公告查询脚本。
 - `name` 缺省时用目录名(或文件名)作为技能名。
+
+## MCP 工具接入
+
+后端可作为 MCP Client 连接受控的 MCP Server,并将其工具注册为带命名空间的内部工具名。复制
+`backend/mcp_servers.example.json` 为 `backend/mcp_servers.json`,将 CodeGraph 的仓库路径替换为实际路径,
+然后设置 `MCP_SERVERS_CONFIG`(可选,默认读取 `backend/mcp_servers.json`)。
+
+CodeGraph stdio 示例:
+
+```bash
+codegraph mcp serve --root /path/to/repository --stdio
+```
+
+每个 MCP Server 必须配置 `allowed_tools`;每个 Skill 可通过 `skill_tools` 进一步限制工具。工具会以
+`mcp__codegraph__search` 这类名称暴露给 Agent。当前版本只接入 MCP Tools,不会自动加载 Resources 或 Prompts,
+以控制 128k 上下文占用。
 
 ## 事件类型
 

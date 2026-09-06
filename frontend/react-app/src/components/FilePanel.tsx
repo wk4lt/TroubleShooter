@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { deleteFile, fileDownloadUrl, listFiles, uploadFile } from "../api";
+import { deleteFile, fileDownloadUrl, listDirectory, uploadFile } from "../api";
 import { log } from "../logger";
-import { FileMeta } from "../types";
+import { DirectoryMeta, FileMeta } from "../types";
 
 interface Props {
   status: string;
@@ -57,6 +57,8 @@ async function traverseEntry(entry: any, base: string): Promise<PendingFile[]> {
 
 export function FilePanel({ status }: Props) {
   const [files, setFiles] = useState<FileMeta[]>([]);
+  const [directories, setDirectories] = useState<DirectoryMeta[]>([]);
+  const [currentPath, setCurrentPath] = useState("");
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -64,11 +66,13 @@ export function FilePanel({ status }: Props) {
 
   const reload = useCallback(async () => {
     try {
-      setFiles(await listFiles());
+      const listing = await listDirectory(currentPath);
+      setFiles(listing.files);
+      setDirectories(listing.directories);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
-  }, []);
+  }, [currentPath]);
 
   useEffect(() => {
     reload();
@@ -106,11 +110,13 @@ export function FilePanel({ status }: Props) {
       if (!list || list.length === 0) return;
       const pending = Array.from(list).map((f) => ({
         file: f,
-        relpath: f.webkitRelativePath || f.name,
+        relpath: currentPath
+          ? `${currentPath}/${f.webkitRelativePath || f.name}`
+          : f.webkitRelativePath || f.name,
       }));
       await uploadMany(pending);
     },
-    [uploadMany]
+    [currentPath, uploadMany]
   );
 
   const handleDrop = useCallback(
@@ -123,7 +129,7 @@ export function FilePanel({ status }: Props) {
         for (let i = 0; i < items.length; i++) {
           const entry = (items[i] as any).webkitGetAsEntry?.();
           if (entry) {
-            pending.push(...(await traverseEntry(entry, "")));
+            pending.push(...(await traverseEntry(entry, currentPath)));
           }
         }
         if (pending.length > 0) {
@@ -133,7 +139,7 @@ export function FilePanel({ status }: Props) {
       }
       await handleFiles(e.dataTransfer.files);
     },
-    [uploadMany, handleFiles]
+    [currentPath, uploadMany, handleFiles]
   );
 
   const handleDelete = useCallback(
@@ -145,6 +151,14 @@ export function FilePanel({ status }: Props) {
     [reload]
   );
 
+  const goUp = () => {
+    const parts = currentPath.split("/").filter(Boolean);
+    parts.pop();
+    setCurrentPath(parts.join("/"));
+  };
+
+  const breadcrumbs = currentPath.split("/").filter(Boolean);
+
   return (
     <section className="panel file-panel">
       <div className="file-panel-head">
@@ -152,6 +166,21 @@ export function FilePanel({ status }: Props) {
         <button className="ghost-btn" onClick={reload} title="刷新">
           ↻
         </button>
+      </div>
+
+      <div className="file-breadcrumbs">
+        <button className="file-crumb" onClick={() => setCurrentPath("")}>根目录</button>
+        {breadcrumbs.map((part, index) => {
+          const path = breadcrumbs.slice(0, index + 1).join("/");
+          return (
+            <span key={path} className="file-crumb-wrap">
+              <span className="file-crumb-separator">/</span>
+              <button className="file-crumb" onClick={() => setCurrentPath(path)}>
+                {part}
+              </button>
+            </span>
+          );
+        })}
       </div>
 
       <div
@@ -205,7 +234,24 @@ export function FilePanel({ status }: Props) {
       {error && <div className="file-error">{error}</div>}
 
       <ul className="file-list">
-        {files.length === 0 && <li className="file-empty">暂无文件</li>}
+        {currentPath && (
+          <li className="file-item file-directory" onClick={goUp}>
+            <span className="file-name">↩ 上一级</span>
+          </li>
+        )}
+        {directories.map((directory) => (
+          <li
+            key={directory.path}
+            className="file-item file-directory"
+            onClick={() => setCurrentPath(directory.path)}
+          >
+            <span className="file-name" title={directory.path}>📁 {directory.name}</span>
+            <span className="file-size">文件夹</span>
+          </li>
+        ))}
+        {files.length === 0 && directories.length === 0 && !currentPath && (
+          <li className="file-empty">暂无文件</li>
+        )}
         {files.map((f) => (
           <li key={f.file_id} className="file-item">
             <span className="file-name" title={f.relpath || f.filename}>

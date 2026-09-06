@@ -12,7 +12,7 @@ def _store():
 
 @registry.tool(
     name="list_files",
-    description="列出当前工作区中的所有文件,返回每个文件的 file_id、文件名、相对路径和大小。",
+    description="列出当前工作区中的所有文件。工作区是 WORKSPACE_DIR，返回每个文件的 file_id、文件名、相对路径和大小。",
     parameters={"type": "object", "properties": {}},
 )
 def list_files():
@@ -21,7 +21,7 @@ def list_files():
 
 @registry.tool(
     name="read_file",
-    description="读取当前工作区中指定文件的内容。仅支持文本文件。filename 可以是文件名或相对路径(如 subdir/a.txt)。",
+    description="读取 WORKSPACE_DIR 中指定文件的内容。仅支持文本文件。filename 可以是文件名或相对路径(如 subdir/a.txt)。",
     parameters={
         "type": "object",
         "properties": {
@@ -44,7 +44,7 @@ def read_file(filename: str):
 
 @registry.tool(
     name="write_file",
-    description="在当前工作区写入一个新文本文件。",
+    description="在 WORKSPACE_DIR 中写入一个新文本文件。",
     parameters={
         "type": "object",
         "properties": {

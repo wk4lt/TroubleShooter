@@ -20,8 +20,12 @@ class ToolRegistry:
     def get(self, name: str) -> Optional[BaseTool]:
         return self._tools.get(name)
 
-    def all_specs(self) -> List[Dict[str, Any]]:
-        return [tool.to_openai_tool() for tool in self._tools.values()]
+    def all_specs(self, allowed_names: Optional[set[str]] = None) -> List[Dict[str, Any]]:
+        return [
+            tool.to_openai_tool()
+            for name, tool in self._tools.items()
+            if allowed_names is None or not name.startswith("mcp__") or name in allowed_names
+        ]
 
     def names(self) -> List[str]:
         return list(self._tools.keys())

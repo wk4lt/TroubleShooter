@@ -5,7 +5,7 @@ from app.config import settings
 
 
 def _parse(text: str):
-    """解析 SKILL.md:返回 (meta, body)。meta 只提取 name/description 两行。"""
+    """解析 SKILL.md，支持普通值和 YAML 折叠多行 description。"""
     meta: Dict[str, str] = {}
     body = text
     if text.startswith("---"):
@@ -13,11 +13,36 @@ def _parse(text: str):
         if end != -1:
             block = text[3:end]
             body = text[end + 4 :].lstrip("\n")
-            for line in block.splitlines():
-                line = line.strip()
-                for key in ("name", "description"):
-                    if line.startswith(f"{key}:"):
-                        meta[key] = line[len(key) + 1 :].strip().strip('"').strip("'")
+            lines = block.splitlines()
+            index = 0
+            while index < len(lines):
+                line = lines[index]
+                stripped = line.strip()
+                matched_key = next(
+                    (key for key in ("name", "description") if stripped.startswith(f"{key}:")),
+                    None,
+                )
+                if matched_key is None:
+                    index += 1
+                    continue
+
+                value = stripped[len(matched_key) + 1 :].strip()
+                if value in (">", ">-", "|", "|-"):
+                    parts = []
+                    index += 1
+                    while index < len(lines):
+                        continuation = lines[index]
+                        if continuation and not continuation[0].isspace():
+                            break
+                        parts.append(continuation.strip())
+                        index += 1
+                    separator = " " if value.startswith(">") else "\n"
+                    value = separator.join(part for part in parts if part).strip()
+                    meta[matched_key] = value
+                    continue
+
+                meta[matched_key] = value.strip('"').strip("'")
+                index += 1
     return meta, body
 
 

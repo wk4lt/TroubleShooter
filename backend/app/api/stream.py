@@ -1,3 +1,4 @@
+import asyncio
 from typing import AsyncIterator
 
 from fastapi import APIRouter
@@ -19,14 +20,30 @@ async def stream_task(task_id: str):
 
     async def event_stream() -> AsyncIterator[str]:
         cursor = 0
+        # Flush the response immediately. This also prevents a proxy from
+        # treating a quiet model request as an idle connection.
+        yield ": connected\n\n"
         while True:
+            pending = []
+            finished = False
+            heartbeat = False
             async with cond:
-                while cursor < len(state.events):
-                    yield state.events[cursor].to_sse()
-                    cursor += 1
-                if state.status in ("completed", "failed") and cursor >= len(state.events):
-                    break
-                await cond.wait()
+                if cursor < len(state.events):
+                    pending = list(state.events[cursor:])
+                    cursor += len(pending)
+                finished = state.status in ("completed", "failed", "cancelled") and not pending
+                if not pending and not finished:
+                    try:
+                        await asyncio.wait_for(cond.wait(), timeout=15)
+                    except asyncio.TimeoutError:
+                        heartbeat = True
+
+            for event in pending:
+                yield event.to_sse()
+            if heartbeat:
+                yield ": keep-alive\n\n"
+            if finished:
+                break
 
     return StreamingResponse(
         event_stream(),

@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import time
 from typing import Dict, List, Optional
 
@@ -14,21 +15,35 @@ class Session:
         self.session_id = session_id
         self.files = FileStore(session_id)
         self.history: List[Dict] = []
+        self.history_lock = threading.RLock()
         self.tasks: Dict[str, AgentState] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
+        self.event_loop = None
         self.last_activity = time.time()
 
     def touch(self) -> None:
         self.last_activity = time.time()
 
+    async def history_snapshot(self) -> List[Dict]:
+        with self.history_lock:
+            return list(self.history)
+
+    async def append_history(self, *messages: Dict) -> None:
+        with self.history_lock:
+            self.history.extend(messages)
+
     def create_task(self, task_id: str, task_input: str, skill: Optional[str] = None) -> AgentState:
         self.touch()
+        self.event_loop = asyncio.get_running_loop()
         state = AgentState(task_id, task_input, self.session_id, skill)
         self.tasks[task_id] = state
         self.conditions[task_id] = asyncio.Condition()
         return state
 
     async def publish(self, task_id: str, event: AgentEvent) -> None:
+        if self.event_loop is not None and self.event_loop is not asyncio.get_running_loop():
+            self.publish_from_thread(task_id, event)
+            return
         state = self.tasks.get(task_id)
         if state is not None:
             state.add_event(event)
@@ -36,6 +51,21 @@ class Session:
         if cond is not None:
             async with cond:
                 cond.notify_all()
+
+    def publish_from_thread(self, task_id: str, event: AgentEvent) -> None:
+        state = self.tasks.get(task_id)
+        if state is not None:
+            state.add_event(event)
+        cond = self.conditions.get(task_id)
+        if cond is not None and self.event_loop is not None:
+            self.event_loop.call_soon_threadsafe(self._notify_condition, cond)
+
+    def _notify_condition(self, cond: asyncio.Condition) -> None:
+        async def notify() -> None:
+            async with cond:
+                cond.notify_all()
+
+        asyncio.create_task(notify())
 
     async def close(self, task_id: str) -> None:
         cond = self.conditions.get(task_id)

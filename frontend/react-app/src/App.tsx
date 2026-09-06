@@ -19,6 +19,7 @@ export default function App() {
     return id;
   });
   const sourceRef = useRef<EventSource | null>(null);
+  const submittingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   const closeStream = useCallback(() => {
@@ -54,26 +55,52 @@ export default function App() {
 
   const handleSubmit = useCallback(
     async (input: string) => {
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       closeStream();
       setError(null);
+
+      const pendingId = `pending-${crypto.randomUUID()}`;
+      setRuns((prev) => [
+        ...prev,
+        { taskId: pendingId, input, status: "created", events: [], result: null },
+      ]);
 
       let id: string;
       try {
         id = await createTask(input, selectedSkill);
         log("info", `创建任务 ${id}: ${input}`, { task_id: id });
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        submittingRef.current = false;
+        const message = err instanceof Error ? err.message : String(err);
+        setRuns((prev) =>
+          prev.map((r) =>
+            r.taskId === pendingId
+              ? { ...r, status: "failed", error: message }
+              : r
+          )
+        );
+        setError(message);
         log("error", `创建任务失败: ${err}`);
         return;
       }
 
       setRuns((prev) => [
-        ...prev,
-        { taskId: id, input, status: "running", events: [], result: null },
+        ...prev.map((r) =>
+          r.taskId === pendingId ? { ...r, taskId: id, status: "running" } : r
+        ),
       ]);
 
       const source = new EventSource(`/api/task/${id}/stream`);
       sourceRef.current = source;
+      let streamFinished = false;
+
+      const closeThisStream = () => {
+        streamFinished = true;
+        source.close();
+        if (sourceRef.current === source) sourceRef.current = null;
+      };
+      submittingRef.current = false;
 
       const on = (type: AgentEvent["type"], handler: (data: Omit<AgentEvent, "type">) => void) => {
         source.addEventListener(type, (e) =>
@@ -87,24 +114,31 @@ export default function App() {
       on("message", (d) => appendEvent(id, { type: "message", ...d }));
       on("final", (d) => {
         appendEvent(id, { type: "final", ...d });
-        updateRun(id, (r) => ({ ...r, result: d.result ?? null, status: "completed" }));
-        log("info", `任务 ${id} 完成`, { task_id: id });
-        closeStream();
+        const failed = d.status === "failed";
+        updateRun(id, (r) => ({
+          ...r,
+          result: d.result ?? null,
+          status: failed ? "failed" : "completed",
+          error: failed ? String(d.result ?? "执行失败") : r.error,
+        }));
+        log(failed ? "error" : "info", failed ? `任务 ${id} 失败` : `任务 ${id} 完成`, { task_id: id });
+        closeThisStream();
       });
       source.onerror = () => {
+        if (streamFinished || source.readyState === EventSource.CLOSED) return;
         updateRun(id, (r) => ({
           ...r,
           status: r.status === "running" ? "failed" : r.status,
           error: "连接中断",
         }));
         log("error", `任务 ${id} 流连接中断`, { task_id: id });
-        closeStream();
+        closeThisStream();
       };
     },
     [appendEvent, closeStream, selectedSkill, updateRun]
   );
 
-  const isRunning = runs.some((r) => r.status === "running");
+  const isRunning = runs.some((r) => r.status === "running" || r.status === "created");
   const selectedRun = runs[runs.length - 1] ?? null;
 
   return (
