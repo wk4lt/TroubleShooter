@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.files import router as files_router
 from app.api.logs import router as logs_router
+from app.api.knowledge import router as knowledge_router
 from app.api.skills import router as skills_router
 from app.api.task import router as task_router
 from app.api.stream import router as stream_router
@@ -71,6 +72,7 @@ app.include_router(task_router)
 app.include_router(stream_router)
 app.include_router(files_router)
 app.include_router(logs_router)
+app.include_router(knowledge_router)
 app.include_router(skills_router)
 
 

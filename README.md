@@ -37,10 +37,12 @@ backend/
 │   │   └── executor.py  # 工具调用执行
 │   ├── api/             # task / stream / files / logs 路由
 │   ├── llm/             # OpenAI 兼容 LLM 客户端
+│   ├── rag/             # LlamaIndex 文档切片与知识检索
 │   ├── tools/           # 工具注册表 + 内置工具 + Skill 脚本执行器
 │   ├── skills/          # Skill 加载器(扫描、解析、按需读取)
 │   └── storage/         # sessions / files / logs / contextvars
 ├── skills/              # 预置 Skill(SKILL.md),当前为股票相关 skill
+├── data/knowledge/      # RAG 知识库: <subsystem_id>/<knowledge_type>/<file>
 ├── requirements.txt
 └── .env                 # 实际密钥(已 gitignore,需自行创建)
 frontend/
@@ -118,6 +120,9 @@ npm run dev
 | GET | `/api/files` | 列出工作区文件 |
 | GET | `/api/files/{file_id}` | 下载文件 |
 | DELETE | `/api/files/{file_id}` | 删除文件 |
+| GET | `/api/knowledge` | 查看已建立索引的知识文档 |
+| POST | `/api/knowledge/upload` | 上传并索引知识文档 |
+| POST | `/api/knowledge/reindex` | 增量刷新知识库索引 |
 | POST | `/api/logs` | 上报前端日志 |
 | GET | `/api/logs` | 查询日志 |
 | GET | `/api/logs/stream` | SSE 实时日志流 |

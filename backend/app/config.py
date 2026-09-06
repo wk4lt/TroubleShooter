@@ -18,6 +18,13 @@ class Settings:
             "SKILLS_DIR",
             str(BASE_DIR / "skills"),
         )
+        self.rag_knowledge_dir = os.getenv(
+            "RAG_KNOWLEDGE_DIR",
+            str(BASE_DIR / "data" / "knowledge"),
+        )
+        self.rag_chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "512"))
+        self.rag_chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
+        self.rag_result_chars = int(os.getenv("RAG_RESULT_CHARS", "6000"))
 
 
 settings = Settings()

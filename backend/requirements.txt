@@ -10,3 +10,4 @@ yfinance
 plotille
 akshare
 PyPDF2
+llama-index-core>=0.12,<0.14
