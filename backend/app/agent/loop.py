@@ -126,10 +126,14 @@ class AgentRuntime:
     def _call_model(self, state: GraphState) -> GraphState:
         iteration = state.get("iteration", 0) + 1
         messages = self.context_manager.prepare(state["messages"])
-        thinking = "正在分析用户任务" if iteration == 1 else "正在根据工具结果继续分析"
+        thinking = (
+            "正在理解任务，规划执行路径并选择合适工具"
+            if iteration == 1
+            else "已收到上一轮工具结果，正在核对证据并决定下一步"
+        )
         self.session.publish_from_thread(
             self.task_state.task_id,
-            AgentEvent(type="thinking", content=thinking),
+            AgentEvent(type="thinking", phase="analysis", content=thinking),
         )
         started_at = time.perf_counter()
         response = llm_client.chat_sync(messages, tools=self.tool_specs)
@@ -138,8 +142,9 @@ class AgentRuntime:
         calls = normalize_tool_calls(message.tool_calls)
         assistant: Dict[str, Any] = {"role": "assistant", "content": message.content}
         if calls:
-            decision = "本轮决策：" + "、".join(
-                f"调用 {call['name']}" for call in calls
+            decision = (
+                f"本轮计划（第 {iteration}/{self.max_iterations} 轮）："
+                + "、".join(f"调用 {call['name']}" for call in calls)
             )
             assistant["tool_calls"] = [
                 {
@@ -153,11 +158,11 @@ class AgentRuntime:
             ]
             next_step = "tools" if iteration < self.max_iterations else "force_finish"
         else:
-            decision = "本轮决策：已有足够工具结果，准备生成最终答案"
+            decision = "证据已足够，正在整理最终答案并保留必要引用"
             next_step = "finish"
         self.session.publish_from_thread(
             self.task_state.task_id,
-            AgentEvent(type="thinking", content=decision),
+            AgentEvent(type="thinking", phase="decision", content=decision),
         )
         return {
             "messages": messages + [assistant],
@@ -197,7 +202,11 @@ class AgentRuntime:
     def _force_finish(self, state: GraphState) -> GraphState:
         self.session.publish_from_thread(
             self.task_state.task_id,
-            AgentEvent(type="thinking", content="正在整理最终答案"),
+            AgentEvent(
+                type="thinking",
+                phase="synthesis",
+                content="执行轮数达到上限，正在基于已有证据整理最终答案",
+            ),
         )
         started_at = time.perf_counter()
         response = llm_client.chat_sync(
@@ -243,10 +252,10 @@ class AgentRuntime:
         result: Dict[str, GraphState] = {}
         error: Dict[str, Exception] = {}
         finished = threading.Event()
+        context = contextvars.copy_context()
 
         def worker() -> None:
             try:
-                context = contextvars.copy_context()
                 result["value"] = context.run(self._invoke_graph_stream, history)
             except Exception as exc:  # noqa: BLE001
                 error["value"] = exc
@@ -277,6 +286,7 @@ class AgentRuntime:
                     self.task_state.task_id,
                     AgentEvent(
                         type="thinking",
+                        phase="setup",
                         content=f"已加载 Skill：{self.task_state.skill}",
                         skill=self.task_state.skill,
                     ),
@@ -284,7 +294,11 @@ class AgentRuntime:
             else:
                 await self.session.publish(
                     self.task_state.task_id,
-                    AgentEvent(type="thinking", content="未指定 Skill，等待模型根据任务选择工具链"),
+                    AgentEvent(
+                        type="thinking",
+                        phase="setup",
+                        content="未指定 Skill，等待模型根据任务选择工具链",
+                    ),
                 )
             # LLM calls and tool execution are synchronous. Keep them off the
             # FastAPI event loop so task creation and SSE delivery stay responsive.

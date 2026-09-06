@@ -121,7 +121,6 @@ npm run dev
 | GET | `/api/files/{file_id}` | 下载文件 |
 | DELETE | `/api/files/{file_id}` | 删除文件 |
 | GET | `/api/knowledge` | 查看已建立索引的知识文档 |
-| POST | `/api/knowledge/upload` | 上传并索引知识文档 |
 | POST | `/api/knowledge/reindex` | 增量刷新知识库索引 |
 | POST | `/api/logs` | 上报前端日志 |
 | GET | `/api/logs` | 查询日志 |
@@ -129,6 +128,15 @@ npm run dev
 | GET | `/health` | 健康检查 |
 
 > 所有接口通过 `X-Session-Id` 请求头区分用户 session(文件下载用 `?session=` 查询参数)。
+
+## 企业知识库与 Skill 协作
+
+RAG 是 Skill 的内部辅助能力，不是用户上传文件问答功能。企业文档由部署或管理员放入：
+`backend/data/knowledge/<subsystem_id>/<knowledge_type>/<file>`，例如
+`order-system/sop/refund.md`，然后调用 `/api/knowledge/reindex` 刷新索引。
+
+已选定的 Skill 在执行日志分析、故障定位等任务时，可以调用 `search_knowledge` 查询设计文档、SOP
+和历史解决方案；用户上传到 Session 工作区的文件仍由 `read_file` 等文件工具处理，不会进入企业 RAG。
 
 ## Session 隔离与文件释放
 

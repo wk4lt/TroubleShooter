@@ -1,14 +1,15 @@
 from typing import Optional
 
 from app.rag.service import knowledge_service
-from app.storage.context import current_workspace_dir
+from app.storage.context import current_skill
 from app.tools.registry import registry
 
 
 @registry.tool(
     name="search_knowledge",
     description=(
-        "检索企业知识库和当前工作区文件，适用于设计文档、问题解决 SOP、接口说明和故障排查。"
+        "在 Skill 执行过程中检索企业内部知识库，适用于设计文档、问题解决 SOP、接口说明和故障排查。"
+        "这不是用户临时文件检索工具，不要要求用户上传文件来使用它；用户文件请使用 read_file。"
         "优先传入 subsystem_id 和 knowledge_type 缩小范围；回答时必须引用返回的 source 和 chunk_id。"
         "知识库目录约定为 backend/data/knowledge/<subsystem_id>/<knowledge_type>/文件。"
     ),
@@ -32,11 +33,15 @@ def search_knowledge(
     knowledge_type: Optional[str] = None,
     top_k: int = 5,
 ):
+    selected_skill = current_skill.get()
+    if not selected_skill:
+        return {
+            "error": "search_knowledge 只能在已选定 Skill 的执行过程中调用",
+            "hint": "请先选择对应 Skill，再由 Skill 流程调用企业知识检索",
+        }
     return knowledge_service.search(
         query=query,
         top_k=top_k,
         subsystem_id=subsystem_id,
         knowledge_type=knowledge_type,
-        workspace_dir=current_workspace_dir.get() or None,
     )
-

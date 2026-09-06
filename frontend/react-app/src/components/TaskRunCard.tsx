@@ -17,6 +17,14 @@ function fmt(v: unknown): string {
   }
 }
 
+const PHASE_LABEL: Record<string, string> = {
+  setup: "准备",
+  analysis: "分析",
+  decision: "决策",
+  tool: "执行",
+  synthesis: "整理",
+};
+
 export function TaskRunCard({ run }: { run: TaskRun }) {
   const toolCalls = run.events.filter((e) => e.type === "tool_call");
   const progressEvents = run.events.filter((e) =>
@@ -48,10 +56,17 @@ export function TaskRunCard({ run }: { run: TaskRun }) {
             <div className="msg-progress">
               {progressEvents.map((event, index) => (
                 <div key={`${event.type}-${index}`} className={`progress-${event.type}`}>
-                  {event.type === "thinking" && <>💭 {event.content}</>}
+                  {event.type === "thinking" && (
+                    <>
+                      💭 <span className="progress-phase">{PHASE_LABEL[event.phase ?? ""] ?? "过程"}</span>{" "}
+                      {event.content}
+                    </>
+                  )}
                   {event.type === "tool_call" && (
                     <>
-                      🔧 调用工具 <span className="mono">{event.tool}</span>
+                      🔧 <span className="progress-phase">执行</span>{" "}
+                      <span className="progress-tool-title">{event.content ?? `调用工具 ${event.tool}`}</span>{" "}
+                      <span className="mono">({event.tool})</span>
                       {event.skill && <> · Skill: <span className="mono">{event.skill}</span></>}
                       {event.arguments && (
                         <details className="progress-arguments">
@@ -64,7 +79,9 @@ export function TaskRunCard({ run }: { run: TaskRun }) {
                   {event.type === "tool_result" && (
                     <details className="progress-result">
                       <summary>
-                        📦 工具 <span className="mono">{event.tool}</span> 已返回结果
+                        📦 <span className="progress-phase">结果</span>{" "}
+                        {event.content ?? `工具 ${event.tool} 已返回结果`}
+                        {event.duration_ms != null && <span className="progress-duration"> · {event.duration_ms.toFixed(0)}ms</span>}
                       </summary>
                       <pre>{fmt(event.result)}</pre>
                     </details>

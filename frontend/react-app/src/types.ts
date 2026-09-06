@@ -7,12 +7,15 @@ export type EventType =
 
 export interface AgentEvent {
   type: EventType;
+  phase?: string | null;
   status?: string | null;
   content?: string | null;
   tool?: string | null;
   skill?: string | null;
+  call_id?: string | null;
   arguments?: Record<string, unknown> | null;
   result?: unknown;
+  duration_ms?: number | null;
   timestamp?: number;
 }
 

@@ -1,6 +1,7 @@
 import hashlib
 import re
 import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -49,7 +50,6 @@ class KnowledgeService:
         self._lock = threading.RLock()
         self._nodes_by_path: Dict[str, List[Dict[str, Any]]] = {}
         self._fingerprints: Dict[str, str] = {}
-        self._workspace_cache: Dict[str, tuple[str, List[Dict[str, Any]]]] = {}
         self._ready = False
 
     @staticmethod
@@ -158,41 +158,20 @@ class KnowledgeService:
             )
             return {"documents": documents, "chunks": chunks}
 
-    def _workspace_nodes(self, workspace_dir: str) -> List[Dict[str, Any]]:
-        base = Path(workspace_dir).resolve()
-        fingerprint_parts: List[str] = []
-        files = list(self._iter_files(base))
-        for path in files:
-            try:
-                fingerprint_parts.append(f"{path}:{self._fingerprint(path)}")
-            except OSError:
-                continue
-        fingerprint = hashlib.sha1("|".join(sorted(fingerprint_parts)).encode()).hexdigest()
-        cached = self._workspace_cache.get(str(base))
-        if cached and cached[0] == fingerprint:
-            return cached[1]
-        nodes: List[Dict[str, Any]] = []
-        for path in files:
-            nodes.extend(self._build_nodes(path, base, "workspace"))
-        self._workspace_cache[str(base)] = (fingerprint, nodes)
-        return nodes
-
     def search(
         self,
         query: str,
         top_k: int = 5,
         subsystem_id: Optional[str] = None,
         knowledge_type: Optional[str] = None,
-        workspace_dir: Optional[str] = None,
     ) -> Dict[str, Any]:
+        started_at = time.perf_counter()
         if not query.strip():
             return {"query": query, "results": [], "message": "检索问题不能为空"}
         with self._lock:
             if not self._ready:
                 self.refresh()
             nodes = [node for group in self._nodes_by_path.values() for node in group]
-            if workspace_dir:
-                nodes.extend(self._workspace_nodes(workspace_dir))
 
             query_terms = _terms(query)
             query_set = set(query_terms)
@@ -228,13 +207,21 @@ class KnowledgeService:
                     "score": round(score, 4),
                     "content": node["text"][: settings.rag_result_chars],
                 })
-            return {
+            response = {
                 "query": query,
+                "knowledge_base": "enterprise",
                 "filters": {"subsystem_id": subsystem_id, "knowledge_type": knowledge_type},
                 "results": results,
                 "total": len(results),
                 "message": "未找到高相关度内容" if not results else "检索完成",
             }
+            log_event(
+                f"RAG search subsystem={subsystem_id or '-'} type={knowledge_type or '-'} "
+                f"candidates={len(nodes)} hits={len(results)} "
+                f"elapsed_ms={(time.perf_counter() - started_at) * 1000:.1f}",
+                source="rag",
+            )
+            return response
 
     def list_documents(self) -> List[Dict[str, Any]]:
         with self._lock:

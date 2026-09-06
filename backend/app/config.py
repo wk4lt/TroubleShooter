@@ -25,6 +25,18 @@ class Settings:
         self.rag_chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "512"))
         self.rag_chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
         self.rag_result_chars = int(os.getenv("RAG_RESULT_CHARS", "6000"))
+        self.tool_max_file_read_bytes = int(
+            os.getenv("TOOL_MAX_FILE_READ_BYTES", str(20 * 1024 * 1024))
+        )
+        self.tool_max_file_read_chars = int(
+            os.getenv("TOOL_MAX_FILE_READ_CHARS", "12000")
+        )
+        self.tool_max_file_read_lines = int(
+            os.getenv("TOOL_MAX_FILE_READ_LINES", "200")
+        )
+        self.tool_max_write_chars = int(
+            os.getenv("TOOL_MAX_WRITE_CHARS", "200000")
+        )
 
 
 settings = Settings()

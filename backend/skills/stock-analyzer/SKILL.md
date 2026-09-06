@@ -88,17 +88,22 @@ The analysis report includes 8 sections:
 
 When user requests stock analysis:
 
-1. **Identify ticker symbol**
+1. **Identify market and ticker symbol**
    - User may provide company name → use web-search to find ticker
    - A-share: Shanghai = `.SS`, Shenzhen = `.SZ`
+   - Use `a-share`, `us-stock`, or `hk-stock` as the `subsystem_id` for enterprise knowledge retrieval.
 
-2. **Execute analysis**
+2. **Retrieve internal market guidance**
+   - Before interpreting the result, call `search_knowledge` with the market `subsystem_id` and `knowledge_type` `sop` or `design` when market rules, data interpretation, or reporting requirements are relevant.
+   - Keep the returned `source` and `chunk_id` for the final citations.
+
+3. **Execute analysis**
    ```bash
    export PYTHONIOENCODING=utf-8
    python "$SKILLS_ROOT/stock-analyzer/scripts/analyze.py" <ticker>
    ```
 
-3. **Interpret results**
+4. **Interpret results**
    - Extract overall rating and key findings
    - Highlight investment recommendation
    - Emphasize risk warnings

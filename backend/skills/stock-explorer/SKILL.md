@@ -87,3 +87,13 @@ python "$SKILLS_ROOT/stock-explorer/scripts/quote.py" report 000660.KS 6mo
 - Data quality may vary by ticker/market
 - 所有输出均为文本格式
 - Windows 环境中文显示需设置 `export PYTHONIOENCODING=utf-8`
+
+## Enterprise Knowledge Workflow
+
+When interpreting a quote or technical report, identify the market first and use `search_knowledge` when internal market guidance or reporting SOP is relevant:
+
+- A-share: `subsystem_id=a-share`
+- US stocks: `subsystem_id=us-stock`
+- HK stocks: `subsystem_id=hk-stock`
+
+Use the returned `source` and `chunk_id` as citations. This enterprise knowledge is supplementary to the live data returned by the scripts.
