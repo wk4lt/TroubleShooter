@@ -30,6 +30,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUN_DIR="$ROOT/.run"
 mkdir -p "$RUN_DIR"
 
+# Prefer the repository virtual environment when it exists, keeping runtime
+# dependencies isolated from the system Python installation.
+BACKEND_PYTHON="python3"
+if [ -x "$ROOT/backend/.venv/bin/python" ] \
+  && "$ROOT/backend/.venv/bin/python" -c 'import fastapi, uvicorn, langgraph, llama_index' >/dev/null 2>&1; then
+  BACKEND_PYTHON="$ROOT/backend/.venv/bin/python"
+fi
+
 BACKEND_HOST="127.0.0.1"
 BACKEND_PORT="8000"
 UI_HOST="127.0.0.1"
@@ -70,10 +78,14 @@ start_backend() {
     echo "backend 已在运行 (pid $(cat "$BACKEND_PID"))"
     return
   fi
+  if ! "$BACKEND_PYTHON" -c 'import fastapi, uvicorn, langgraph, llama_index' >/dev/null 2>&1; then
+    echo "backend 依赖未安装。请执行: $BACKEND_PYTHON -m pip install -r $ROOT/backend/requirements.txt"
+    return 1
+  fi
   echo "启动 backend  -> http://$BACKEND_HOST:$BACKEND_PORT"
   (
     cd "$ROOT/backend"
-    setsid python3 -m uvicorn app.main:app \
+    setsid "$BACKEND_PYTHON" -m uvicorn app.main:app \
       --host "$BACKEND_HOST" --port "$BACKEND_PORT" \
       >> "$BACKEND_LOG" 2>&1 < /dev/null &
     echo $! > "$BACKEND_PID"

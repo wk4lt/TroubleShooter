@@ -48,7 +48,6 @@ backend/
 frontend/
 └── react-app/           # Vite + React + TS 控制台
 dev.sh                   # 根目录启停/管理脚本(推荐)
-scripts/dev.sh           # 备用启停脚本
 ```
 
 ## 快速开始
@@ -76,8 +75,9 @@ scripts/dev.sh           # 备用启停脚本
 ```bash
 cd backend
 cp .env.example .env        # 填入 OPENAI_API_KEY
-python3 -m pip install -r requirements.txt
-python3 -m uvicorn app.main:app --reload
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python -m uvicorn app.main:app --reload
 ```
 
 前端:
@@ -88,7 +88,7 @@ npm install
 npm run dev
 ```
 
-首次启动前端必须先执行一次 `npm install`;根目录 `./dev.sh start` 不会自动安装依赖。
+首次启动前端必须先执行一次 `npm install`;根目录 `./dev.sh start` 不会自动安装依赖。它会优先使用依赖完整的 `backend/.venv/bin/python`,并在后端依赖缺失时输出安装命令。
 
 - 后端监听 `http://127.0.0.1:8000`
 - 前端监听 `http://127.0.0.1:5173`,已配置 `/api` 代理到后端
@@ -160,7 +160,7 @@ description: 日志故障定位:根据服务日志与错误堆栈系统化定位
 - 启动时自动扫描 `SKILLS_DIR`(默认 `backend/skills`),将每个 skill 的 `name + description` 注入 system prompt,让 Agent 知道有哪些能力。
 - Agent 需要详细说明时调用 `read_skill` 工具按需读取正文,避免大段说明常驻上下文。
 - Skill 需要执行外部脚本时调用 `run_skill_script`;运行路径限制在所选 Skill 目录内,且不经过 shell。
-- 股票 skill 的运行依赖已列入 `backend/requirements.txt`;首次安装后才可执行行情和公告查询脚本。
+- 股票 skill 的运行依赖在各自的 `SKILL.md` 中说明；按需安装后才可执行行情和公告查询脚本。
 - `name` 缺省时用目录名(或文件名)作为技能名。
 
 ## MCP 工具接入
@@ -174,6 +174,8 @@ CodeGraph stdio 示例:
 ```bash
 codegraph mcp serve --root /path/to/repository --stdio
 ```
+
+使用 MCP 前先执行 `python3 -m pip install mcp==0.9.1`。
 
 每个 MCP Server 必须配置 `allowed_tools`;每个 Skill 可通过 `skill_tools` 进一步限制工具。工具会以
 `mcp__codegraph__search` 这类名称暴露给 Agent。当前版本只接入 MCP Tools,不会自动加载 Resources 或 Prompts,
