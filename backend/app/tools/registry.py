@@ -27,8 +27,4 @@ class ToolRegistry:
             if allowed_names is None or not name.startswith("mcp__") or name in allowed_names
         ]
 
-    def names(self) -> List[str]:
-        return list(self._tools.keys())
-
-
 registry = ToolRegistry()

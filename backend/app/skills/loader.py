@@ -95,12 +95,6 @@ def _get_skills() -> Dict[str, Dict]:
     return _SKILLS
 
 
-def reload() -> Dict[str, Dict]:
-    global _SKILLS
-    _SKILLS = _load()
-    return _SKILLS
-
-
 def list_skill_summaries() -> List[Dict[str, str]]:
     return [
         {"name": s["name"], "description": s["description"]}

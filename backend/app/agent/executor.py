@@ -10,7 +10,6 @@ from app.agent.context import compact_tool_output
 from app.agent.protocol import ToolCall, ToolResult
 from app.logger import log_event
 from app.storage.context import current_skill
-from app.storage.sessions import Session
 
 
 def _tool_intent(name: str, arguments: Dict[str, Any]) -> str:
@@ -30,8 +29,6 @@ def _tool_intent(name: str, arguments: Dict[str, Any]) -> str:
         return "将分析结果写入工作区文件"
     if name == "get_time":
         return "获取当前时间，校准结果时效性"
-    if name == "search_database":
-        return "查询结构化数据源，补充事实信息"
     return f"调用 {name}，获取下一步所需信息"
 
 
@@ -148,63 +145,3 @@ def execute_tool_calls_sync(
         task_id=task_id,
     )
     return messages, events
-
-
-async def execute_tool_calls(
-    tool_calls: List[ToolCall], session: Session, task_id: str
-) -> List[Dict[str, Any]]:
-    """Execute normalized calls and return OpenAI-compatible tool messages."""
-    from app.tools.registry import registry
-
-    messages: List[Dict[str, Any]] = []
-    for call in tool_calls:
-        name = call["name"]
-        call_id = call["id"]
-        await session.publish(task_id, AgentEvent(type="tool_call", tool=name))
-        log_event(
-            f"调用工具 {name}",
-            level="info",
-            source="agent",
-            session_id=session.session_id,
-            task_id=task_id,
-            tool=name,
-        )
-
-        result: ToolResult = {
-            "tool_call_id": call_id,
-            "name": name,
-            "output": None,
-            "error": None,
-        }
-        tool = registry.get(name)
-        if tool is None:
-            result["error"] = f"未知工具: {name}"
-        else:
-            try:
-                result["output"] = await tool.execute(call["arguments"])
-            except Exception as exc:  # noqa: BLE001
-                result["error"] = str(exc)
-                log_event(
-                    f"工具 {name} 执行异常: {exc}",
-                    level="error",
-                    source="agent",
-                    session_id=session.session_id,
-                    task_id=task_id,
-                    tool=name,
-                )
-
-        output = result["output"]
-        if result["error"] is not None:
-            output = {"error": result["error"]}
-        await session.publish(
-            task_id,
-            AgentEvent(type="tool_result", tool=name, result=output),
-        )
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": result["tool_call_id"],
-                "content": compact_tool_output(output),
-            }
-        )
-    return messages
