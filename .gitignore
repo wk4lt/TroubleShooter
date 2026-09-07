@@ -9,6 +9,7 @@ backend/data/
 backend/logs/
 .run/
 knowledge-mcp/.venv/
+knowledge-mcp/.python-3.12.8/
 knowledge-mcp/datasets/external/*
 !knowledge-mcp/datasets/external/.gitkeep
 knowledge-mcp/knowledge/COMMON/reference/*

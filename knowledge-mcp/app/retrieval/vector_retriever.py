@@ -16,7 +16,12 @@ class VectorRetriever:
         provider = str(embedding.get("provider", "mock"))
         self._mock = provider == "mock"
         if provider == "huggingface":
-            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+            try:
+                from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+            except ImportError as exc:
+                raise RuntimeError(
+                    "HuggingFace embeddings require: pip install -e '.[huggingface]'"
+                ) from exc
 
             embed_model = HuggingFaceEmbedding(model_name=str(embedding["model"]))
         elif provider == "mock":

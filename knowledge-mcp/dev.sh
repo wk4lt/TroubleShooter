@@ -3,7 +3,11 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV="$ROOT/.venv"
-PYTHON="${KNOWLEDGE_PYTHON:-python3.11}"
+LOCAL_PYTHON="$ROOT/.python-3.12.8/bin/python3.12"
+PYTHON="${KNOWLEDGE_PYTHON:-$LOCAL_PYTHON}"
+if [ ! -x "$PYTHON" ]; then
+  PYTHON="python3.11"
+fi
 HOST="${KNOWLEDGE_MCP_HOST:-127.0.0.1}"
 PORT="${KNOWLEDGE_MCP_PORT:-8010}"
 

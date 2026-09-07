@@ -31,6 +31,7 @@ LlamaIndex、向量数据库或文档解析代码。
 默认管线为 metadata router → LlamaIndex Vector Retriever → BM25 → RRF → exact identifier boost →
 NoOp reranker → parent context merge。所有参数集中在 `config.yaml`；开发样本默认 `mock` embedding，可在离线环境
 运行。准备好模型后，将 `embedding.provider` 改为 `huggingface`，模型保持可配置。
+此时再安装可选模型依赖：`knowledge-mcp/.venv/bin/python -m pip install -e '.[huggingface]'`。
 
 ```bash
 ./knowledge-mcp/dev.sh eval
