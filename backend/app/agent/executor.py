@@ -21,6 +21,12 @@ def _tool_intent(name: str, arguments: Dict[str, Any]) -> str:
     if name == "search_knowledge":
         subsystem = arguments.get("subsystem_id") or "相关子系统"
         return f"检索 {subsystem} 企业知识库，补充设计文档或 SOP 依据"
+    if name == "search_runbook":
+        return "检索受控 Runbook，为下一步诊断决策提供依据"
+    if name == "get_document":
+        return "读取检索命中的知识文档全文，核对证据上下文"
+    if name == "get_context":
+        return "读取命中知识片段的父级上下文"
     if name == "list_files":
         return "检查当前工作区，确认可用输入文件"
     if name == "read_file":
@@ -38,6 +44,8 @@ def _tool_result_summary(name: str, output: Any, error: Optional[str]) -> str:
     if name == "search_knowledge" and isinstance(output, dict):
         total = output.get("total", len(output.get("results", [])))
         return f"知识检索完成，命中 {total} 条结果，下一步核对引用来源"
+    if name == "search_runbook" and isinstance(output, dict):
+        return f"Runbook 检索完成，命中 {len(output.get('results', []))} 条受控处置流程"
     if name == "run_skill_script" and isinstance(output, dict):
         state = "成功" if output.get("ok", True) else "返回异常"
         return f"Skill 脚本{state}，已返回标准输出和错误输出"

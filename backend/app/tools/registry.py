@@ -24,7 +24,7 @@ class ToolRegistry:
         return [
             tool.to_openai_tool()
             for name, tool in self._tools.items()
-            if allowed_names is None or not name.startswith("mcp__") or name in allowed_names
+            if allowed_names is None or not getattr(tool, "is_mcp", False) or name in allowed_names
         ]
 
 registry = ToolRegistry()

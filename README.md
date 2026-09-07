@@ -181,6 +181,24 @@ codegraph mcp serve --root /path/to/repository --stdio
 `mcp__codegraph__search` 这类名称暴露给 Agent。当前版本只接入 MCP Tools,不会自动加载 Resources 或 Prompts,
 以控制 128k 上下文占用。
 
+## Knowledge MCP
+
+企业知识检索运行在独立的 `knowledge-mcp/` 服务中，使用 Python 3.11+ 和 LlamaIndex；现有 Agent Runtime 保持
+原有 Python 3.9.11 环境，并且只通过 MCP Streamable HTTP 调用它。详细的安装、语料导入、检索配置和评测说明见
+[`knowledge-mcp/README.md`](knowledge-mcp/README.md)。
+
+首次安装并启动：
+
+```bash
+./knowledge-mcp/dev.sh setup
+./knowledge-mcp/dev.sh fetch-datasets
+./knowledge-mcp/dev.sh serve
+cp backend/mcp_servers.example.json backend/mcp_servers.json
+```
+
+Knowledge MCP 只暴露 `search_knowledge`、`search_runbook`、`get_document`、`get_context` 和
+`list_knowledge_bases`。文档导入和重建索引是管理员 CLI 操作，不会暴露给 Agent。
+
 ## 事件类型
 
 `thinking` / `tool_call` / `tool_result` / `message` / `final`
