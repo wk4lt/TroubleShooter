@@ -11,8 +11,11 @@ Web UI (React + TS + Vite)
 Streaming API (FastAPI)
    │
 Agent Runtime
+├── OpenVikingAdapter（官方 OpenViking HTTP SDK）
+├── RCARetriever（故障链 Exact Hash / BM25 / 时序 / Case 聚合）
+└── ContextOrchestrator（当前仅提供 OpenViking 上下文）
    │
-LLM (OpenAI 兼容接口) + Tools + Session Memory
+LLM（OpenAI 兼容接口）+ Tools
 ```
 
 ## 技术栈
@@ -37,12 +40,12 @@ backend/
 │   │   └── executor.py  # 工具调用执行
 │   ├── api/             # task / stream / files / logs 路由
 │   ├── llm/             # OpenAI 兼容 LLM 客户端
-│   ├── rag/             # LlamaIndex 文档切片与知识检索
+│   ├── context/         # 官方 OpenViking 适配与上下文编排
 │   ├── tools/           # 工具注册表 + 内置工具 + Skill 脚本执行器
 │   ├── skills/          # Skill 加载器(扫描、解析、按需读取)
 │   └── storage/         # sessions / files / logs / contextvars
 ├── skills/              # 预置 Skill(SKILL.md),当前为股票相关 skill
-├── data/knowledge/      # RAG 知识库: <subsystem_id>/<knowledge_type>/<file>
+├── data/knowledge/      # 将导入 OpenViking 的知识资源
 ├── requirements.txt
 └── .env                 # 实际密钥(已 gitignore,需自行创建)
 frontend/
@@ -104,10 +107,13 @@ npm run dev
 | `OPENAI_MODEL` | 模型名 | `deepseek-chat` |
 | `AGENT_MAX_ITERATIONS` | Agent 循环上限 | `10` |
 | `SESSION_TTL_SECONDS` | 空闲 session 自动清理时间(秒) | `1800` |
+| `OPENVIKING_URL` | 官方 OpenViking 服务 URL | `http://127.0.0.1:1933` |
+| `OPENVIKING_API_KEY` | 官方服务 API Key | - |
+| `OPENVIKING_RESOURCE_URI` | 导入资源的 Viking URI | `viking://resources/troubleshooter` |
 | `SKILLS_DIR` | Skill 目录 | `backend/skills` |
 
-> 依赖版本已固定(尤其 `openai==1.35.7` 需配合 `httpx==0.27.2`,否则会报
-> `AsyncClient.__init__() got an unexpected keyword argument 'proxies'`)。
+> OpenViking 当前发布版依赖新版 FastAPI、MCP、OpenAI SDK 与 HTTPX；请始终按
+> `backend/requirements.txt` 整体安装，避免单独降级其中任一包。
 
 ## API
 
@@ -129,14 +135,25 @@ npm run dev
 
 > 所有接口通过 `X-Session-Id` 请求头区分用户 session(文件下载用 `?session=` 查询参数)。
 
-## 企业知识库与 Skill 协作
+## OpenViking 知识、Session 与 Memory
 
-RAG 是 Skill 的内部辅助能力，不是用户上传文件问答功能。企业文档由部署或管理员放入：
-`backend/data/knowledge/<subsystem_id>/<knowledge_type>/<file>`，例如
-`order-system/sop/refund.md`，然后调用 `/api/knowledge/reindex` 刷新索引。
+先按官方方式初始化并启动独立服务：
 
-已选定的 Skill 在执行日志分析、故障定位等任务时，可以调用 `search_knowledge` 查询设计文档、SOP
-和历史解决方案；用户上传到 Session 工作区的文件仍由 `read_file` 等文件工具处理，不会进入企业 RAG。
+```bash
+backend/.venv/bin/openviking-server init
+backend/.venv/bin/openviking-server
+```
+
+将企业文档放入 `backend/data/knowledge/` 后调用 `POST /api/knowledge/reindex`。该接口通过官方
+`SyncHTTPClient.add_resource(..., wait=True)` 导入，`search_knowledge` 通过官方 `find()` 检索。Agent 的
+浏览器 Session 映射为官方 Session，消息用 `add_message()` 写入、任务结束用 `commit_session()`；资源分层、
+检索、Session 压缩和 Memory 提取均由 OpenViking 服务完成。
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python backend/scripts/openviking_smoke.py
+```
+
+用户上传到 Session 工作区的文件仍由 `read_file` 等文件工具处理，不会自动导入知识资源。
 
 ## Session 隔离与文件释放
 
@@ -175,29 +192,16 @@ CodeGraph stdio 示例:
 codegraph mcp serve --root /path/to/repository --stdio
 ```
 
-使用 MCP 前先执行 `python3 -m pip install mcp==0.9.1`。
+使用 MCP 前按 `backend/requirements.txt` 整体安装依赖。
 
 每个 MCP Server 必须配置 `allowed_tools`;每个 Skill 可通过 `skill_tools` 进一步限制工具。工具会以
 `mcp__codegraph__search` 这类名称暴露给 Agent。当前版本只接入 MCP Tools,不会自动加载 Resources 或 Prompts,
 以控制 128k 上下文占用。
 
-## Knowledge MCP
+## RCA 检索边界
 
-企业知识检索运行在独立的 `knowledge-mcp/` 服务中，使用 Python 3.11+ 和 LlamaIndex；现有 Agent Runtime 保持
-原有 Python 3.9.11 环境，并且只通过 MCP Streamable HTTP 调用它。详细的安装、语料导入、检索配置和评测说明见
-[`knowledge-mcp/README.md`](knowledge-mcp/README.md)。
-
-首次安装并启动：
-
-```bash
-./knowledge-mcp/dev.sh setup
-./knowledge-mcp/dev.sh fetch-datasets
-./knowledge-mcp/dev.sh serve
-cp backend/mcp_servers.example.json backend/mcp_servers.json
-```
-
-Knowledge MCP 只暴露 `search_knowledge`、`search_runbook`、`get_document`、`get_context` 和
-`list_knowledge_bases`。文档导入和重建索引是管理员 CLI 操作，不会暴露给 Agent。
+故障链的 Exact Hash、BM25、时序匹配与 Case 聚合仍属于 RCA 业务模块，不迁移到 OpenViking。
+当前 `ContextOrchestrator` 不调用、传递或合并 RCA 结果；后续如需恢复联合编排，应以独立需求重新设计接口。它不实现或替代这些算法。
 
 ## 事件类型
 

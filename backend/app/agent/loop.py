@@ -14,6 +14,7 @@ from app.agent.planner import build_system_prompt, get_tool_specs
 from app.agent.protocol import ToolCall, normalize_tool_calls
 from app.agent.state import AgentState
 from app.config import settings
+from app.context.orchestrator import ContextOrchestrator
 from app.llm.client import llm_client
 from app.logger import log_event
 from app.storage.context import (
@@ -44,6 +45,7 @@ class AgentRuntime:
         self.max_iterations = max(1, settings.agent_max_iterations)
         self.tool_specs: List[Dict[str, Any]] = []
         self.context_manager: ContextManager | None = None
+        self.context_orchestrator = ContextOrchestrator()
         self.started_at = 0.0
         self.total_prompt_tokens = 0
         self.total_completion_tokens = 0
@@ -224,13 +226,15 @@ class AgentRuntime:
     def _finish(self, state: GraphState) -> GraphState:
         return {"final_content": state.get("final_content", "")}
 
-    def _invoke_graph_stream(self, history: List[Dict[str, Any]]) -> GraphState:
+    def _invoke_graph_stream(self, retrieved_context: List[Dict[str, Any]]) -> GraphState:
         """Run the blocking LangGraph graph in the worker thread."""
         self._prepare()
         assert self.context_manager is not None
         assert self.graph is not None
         initial: GraphState = {
-            "messages": self.context_manager.build_initial(history, self.task_state.task_input),
+            "messages": self.context_manager.build_initial(
+                retrieved_context, self.task_state.task_input
+            ),
             "iteration": 0,
             "tool_calls": [],
             "tool_events": [],
@@ -247,7 +251,7 @@ class AgentRuntime:
 
         return result
 
-    async def _invoke_graph_async(self, history: List[Dict[str, Any]]) -> GraphState:
+    async def _invoke_graph_async(self, retrieved_context: List[Dict[str, Any]]) -> GraphState:
         """Run LangGraph without blocking the FastAPI loop or awaiting its executor."""
         result: Dict[str, GraphState] = {}
         error: Dict[str, Exception] = {}
@@ -256,7 +260,7 @@ class AgentRuntime:
 
         def worker() -> None:
             try:
-                result["value"] = context.run(self._invoke_graph_stream, history)
+                result["value"] = context.run(self._invoke_graph_stream, retrieved_context)
             except Exception as exc:  # noqa: BLE001
                 error["value"] = exc
             finally:
@@ -280,7 +284,6 @@ class AgentRuntime:
         workspace_token = current_workspace_dir.set(str(self.session.files.base_dir))
         self.started_at = time.perf_counter()
         try:
-            history = await self.session.history_snapshot()
             if self.task_state.skill:
                 await self.session.publish(
                     self.task_state.task_id,
@@ -302,12 +305,14 @@ class AgentRuntime:
                 )
             # LLM calls and tool execution are synchronous. Keep them off the
             # FastAPI event loop so task creation and SSE delivery stay responsive.
-            result = await self._invoke_graph_async(history)
+            retrieved_context = await self.context_orchestrator.begin_task(
+                self.session.session_id, self.task_state.task_input
+            )
+            result = await self._invoke_graph_async(retrieved_context)
             self.task_state.status = "completed"
             self.task_state.result = result.get("final_content", "")
-            await self.session.append_history(
-                {"role": "user", "content": self.task_state.task_input},
-                {"role": "assistant", "content": self.task_state.result},
+            await self.context_orchestrator.complete_task(
+                self.session.session_id, self.task_state.result
             )
             await self.session.publish(self.task_state.task_id, AgentEvent(type="message", content=self.task_state.result))
             await self.session.publish(

@@ -1,5 +1,4 @@
 import asyncio
-import threading
 import time
 from typing import Dict, List, Optional
 
@@ -14,8 +13,6 @@ class Session:
     def __init__(self, session_id: str):
         self.session_id = session_id
         self.files = FileStore(session_id)
-        self.history: List[Dict] = []
-        self.history_lock = threading.RLock()
         self.tasks: Dict[str, AgentState] = {}
         self.conditions: Dict[str, asyncio.Condition] = {}
         self.event_loop = None
@@ -23,14 +20,6 @@ class Session:
 
     def touch(self) -> None:
         self.last_activity = time.time()
-
-    async def history_snapshot(self) -> List[Dict]:
-        with self.history_lock:
-            return list(self.history)
-
-    async def append_history(self, *messages: Dict) -> None:
-        with self.history_lock:
-            self.history.extend(messages)
 
     def create_task(self, task_id: str, task_input: str, skill: Optional[str] = None) -> AgentState:
         self.touch()
@@ -78,7 +67,6 @@ class Session:
 
     def cleanup(self) -> None:
         self.files.clear()
-        self.history.clear()
         self.tasks.clear()
         self.conditions.clear()
 

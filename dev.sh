@@ -34,7 +34,7 @@ mkdir -p "$RUN_DIR"
 # dependencies isolated from the system Python installation.
 BACKEND_PYTHON="python3"
 if [ -x "$ROOT/backend/.venv/bin/python" ] \
-  && "$ROOT/backend/.venv/bin/python" -c 'import fastapi, uvicorn, langgraph, llama_index' >/dev/null 2>&1; then
+  && "$ROOT/backend/.venv/bin/python" -c 'import fastapi, uvicorn, langgraph, openviking' >/dev/null 2>&1; then
   BACKEND_PYTHON="$ROOT/backend/.venv/bin/python"
 fi
 
@@ -78,7 +78,7 @@ start_backend() {
     echo "backend 已在运行 (pid $(cat "$BACKEND_PID"))"
     return
   fi
-  if ! "$BACKEND_PYTHON" -c 'import fastapi, uvicorn, langgraph, llama_index' >/dev/null 2>&1; then
+  if ! "$BACKEND_PYTHON" -c 'import fastapi, uvicorn, langgraph, openviking' >/dev/null 2>&1; then
     echo "backend 依赖未安装。请执行: $BACKEND_PYTHON -m pip install -r $ROOT/backend/requirements.txt"
     return 1
   fi

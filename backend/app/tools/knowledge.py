@@ -1,6 +1,6 @@
 from typing import Optional
 
-from app.rag.service import knowledge_service
+from app.context.openviking_adapter import OpenVikingAdapter
 from app.storage.context import current_skill
 from app.tools.registry import registry
 
@@ -10,8 +10,7 @@ from app.tools.registry import registry
     description=(
         "在 Skill 执行过程中检索企业内部知识库，适用于设计文档、问题解决 SOP、接口说明和故障排查。"
         "这不是用户临时文件检索工具，不要要求用户上传文件来使用它；用户文件请使用 read_file。"
-        "优先传入 subsystem_id 和 knowledge_type 缩小范围；回答时必须引用返回的 source 和 chunk_id。"
-        "知识库目录约定为 backend/data/knowledge/<subsystem_id>/<knowledge_type>/文件。"
+            "检索由官方 OpenViking 服务执行；回答时必须引用返回的 URI。"
     ),
     parameters={
         "type": "object",
@@ -27,7 +26,7 @@ from app.tools.registry import registry
         "required": ["query"],
     },
 )
-def search_knowledge(
+async def search_knowledge(
     query: str,
     subsystem_id: Optional[str] = None,
     knowledge_type: Optional[str] = None,
@@ -39,9 +38,12 @@ def search_knowledge(
             "error": "search_knowledge 只能在已选定 Skill 的执行过程中调用",
             "hint": "请先选择对应 Skill，再由 Skill 流程调用企业知识检索",
         }
-    return knowledge_service.search(
-        query=query,
-        top_k=top_k,
-        subsystem_id=subsystem_id,
-        knowledge_type=knowledge_type,
-    )
+    # These optional business filters are not mapped to an OpenViking query yet.
+    _ = subsystem_id, knowledge_type
+    # Tool calls execute in a worker-owned event loop.  Give that loop its own
+    # official client and close it before returning, avoiding cross-loop reuse.
+    adapter = OpenVikingAdapter()
+    try:
+        return await adapter.find(query=query, limit=top_k)
+    finally:
+        await adapter.close()

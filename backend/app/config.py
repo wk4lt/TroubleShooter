@@ -14,6 +14,17 @@ class Settings:
         self.openai_model = os.getenv("OPENAI_MODEL", "deepseek-chat")
         self.agent_max_iterations = int(os.getenv("AGENT_MAX_ITERATIONS", "10"))
         self.session_ttl_seconds = int(os.getenv("SESSION_TTL_SECONDS", "1800"))
+        self.openviking_url = os.getenv("OPENVIKING_URL", "http://127.0.0.1:1933")
+        self.openviking_api_key = os.getenv("OPENVIKING_API_KEY", "")
+        self.openviking_timeout_seconds = float(
+            os.getenv("OPENVIKING_TIMEOUT_SECONDS", "30")
+        )
+        self.openviking_resource_uri = os.getenv(
+            "OPENVIKING_RESOURCE_URI", "viking://resources/troubleshooter"
+        )
+        self.openviking_session_token_budget = int(
+            os.getenv("OPENVIKING_SESSION_TOKEN_BUDGET", "12000")
+        )
         self.skills_dir = os.getenv(
             "SKILLS_DIR",
             str(BASE_DIR / "skills"),
@@ -22,9 +33,6 @@ class Settings:
             "RAG_KNOWLEDGE_DIR",
             str(BASE_DIR / "data" / "knowledge"),
         )
-        self.rag_chunk_size = int(os.getenv("RAG_CHUNK_SIZE", "512"))
-        self.rag_chunk_overlap = int(os.getenv("RAG_CHUNK_OVERLAP", "80"))
-        self.rag_result_chars = int(os.getenv("RAG_RESULT_CHARS", "6000"))
         self.tool_max_file_read_bytes = int(
             os.getenv("TOOL_MAX_FILE_READ_BYTES", str(20 * 1024 * 1024))
         )

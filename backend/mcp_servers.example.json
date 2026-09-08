@@ -1,19 +1,6 @@
 {
   "servers": [
     {
-      "name": "knowledge",
-      "transport": "streamable_http",
-      "expose_unprefixed": true,
-      "url": "http://localhost:8010/mcp",
-      "allowed_tools": [
-        "search_knowledge",
-        "search_runbook",
-        "get_document",
-        "get_context",
-        "list_knowledge_bases"
-      ]
-    },
-    {
       "name": "codegraph",
       "command": "codegraph",
       "args": ["mcp", "serve", "--root", "/path/to/repository", "--stdio"],
