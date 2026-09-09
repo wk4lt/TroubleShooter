@@ -5,27 +5,49 @@
       "command": "codegraph",
       "args": ["mcp", "serve", "--root", "/path/to/repository", "--stdio"],
       "allowed_tools": [
-        "explore",
+        "orient",
+        "packet_get",
         "search",
         "get_file",
+        "get_symbol",
         "refs",
         "goto",
-        "file_deps",
+        "deps",
+        "rdeps",
         "path",
-        "freshness"
+        "impact",
+        "refresh_index"
       ]
     }
   ],
   "skill_tools": {
     "code-review": [
-      "mcp__codegraph__explore",
+      "mcp__codegraph__orient",
+      "mcp__codegraph__packet_get",
       "mcp__codegraph__search",
       "mcp__codegraph__get_file",
+      "mcp__codegraph__get_symbol",
       "mcp__codegraph__refs",
       "mcp__codegraph__goto",
-      "mcp__codegraph__file_deps",
+      "mcp__codegraph__deps",
+      "mcp__codegraph__rdeps",
       "mcp__codegraph__path",
-      "mcp__codegraph__freshness"
+      "mcp__codegraph__impact",
+      "mcp__codegraph__refresh_index"
+    ],
+    "code-repository-analyzer": [
+      "mcp__codegraph__orient",
+      "mcp__codegraph__packet_get",
+      "mcp__codegraph__search",
+      "mcp__codegraph__get_file",
+      "mcp__codegraph__get_symbol",
+      "mcp__codegraph__refs",
+      "mcp__codegraph__goto",
+      "mcp__codegraph__deps",
+      "mcp__codegraph__rdeps",
+      "mcp__codegraph__path",
+      "mcp__codegraph__impact",
+      "mcp__codegraph__refresh_index"
     ]
   }
 }

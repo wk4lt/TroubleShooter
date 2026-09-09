@@ -198,6 +198,29 @@ codegraph mcp serve --root /path/to/repository --stdio
 `mcp__codegraph__search` 这类名称暴露给 Agent。当前版本只接入 MCP Tools,不会自动加载 Resources 或 Prompts,
 以控制 128k 上下文占用。
 
+### Code Repository Analyzer Demo
+
+`code-repository-analyzer` 是一个编排 Skill：CodeGraph 提供源码事实，官方 OpenViking 提供设计和文档语义。
+它不会重建代码索引或 RAG。以 OpenViking 官方仓库演示时，先克隆
+`https://github.com/volcengine/OpenViking.git`，将其路径设为 CodeGraph `--root`，并在 `.env` 中设置：
+
+```bash
+OPENVIKING_DEMO_REPO=/path/to/OpenViking
+OPENVIKING_RESOURCE_URI=viking://resources/openviking-demo
+```
+
+然后启动官方 OpenViking 服务，并执行：
+
+```bash
+PYTHONPATH=backend backend/.venv/bin/python backend/scripts/import_openviking_demo.py \
+  --repo /path/to/OpenViking
+```
+
+该脚本只导入 `README.md` 及 `docs` / `architecture` / `concepts` / `api` / `guides` / `design` / `adr` 文档目录；源码仍只由 CodeGraph
+解析。复制 MCP 示例配置时，保留其中 `skill_tools.code-repository-analyzer` 的 CodeGraph 工具白名单。完整的
+路由规则、对比结论枚举、可执行问题和实际工具调用审计方式见
+`backend/skills/code-repository-analyzer/README.md`。
+
 ## RCA 检索边界
 
 故障链的 Exact Hash、BM25、时序匹配与 Case 聚合仍属于 RCA 业务模块，不迁移到 OpenViking。

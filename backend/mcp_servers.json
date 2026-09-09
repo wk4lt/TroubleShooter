@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "name": "codegraph",
+      "transport": "streamable_http",
+      "url": "http://127.0.0.1:7332/mcp"
+    }
+  ],
+  "skill_tools": {
+    "code-repository-analyzer": []
+  }
+}
